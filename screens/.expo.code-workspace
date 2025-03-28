@@ -1,0 +1,28 @@
+{
+	"folders": [
+		{
+			"path": "../.expo"
+		},
+		{
+			"path": "../.git"
+		},
+		{
+			"path": "../android"
+		},
+		{
+			"path": "../assets"
+		},
+		{
+			"path": "../hooks"
+		},
+		{
+			"path": "../navigation"
+		},
+		{
+			"path": "../node_modules"
+		},
+		{
+			"path": "."
+		}
+	]
+}
