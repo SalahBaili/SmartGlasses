@@ -24,6 +24,7 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // 👁️
 
   const handleAuth = async () => {
     if (!email || !password) {
@@ -88,16 +89,22 @@ export default function LoginScreen({ navigation }) {
                 value={password}
                 onChangeText={setPassword}
                 style={styles.input}
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 placeholderTextColor="#888"
               />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <Text style={{ fontSize: 16 }}>{showPassword ? "🙈" : "👁️"}</Text>
+              </TouchableOpacity>
             </View>
+
             <TouchableOpacity
-  onPress={() => navigation.navigate("ForgotPassword")}
-  style={{ alignSelf: "flex-end", marginBottom: 10 }}
->
-  <Text style={{ color: "#007AFF", fontWeight: "bold" }}>Mot de passe oublié ?</Text>
-</TouchableOpacity>
+              onPress={() => navigation.navigate("ForgotPassword")}
+              style={{ alignSelf: "flex-end", marginBottom: 10 }}
+            >
+              <Text style={{ color: "#007AFF", fontWeight: "bold" }}>
+                Mot de passe oublié ?
+              </Text>
+            </TouchableOpacity>
 
             <TouchableOpacity style={styles.button} onPress={handleAuth}>
               {loading ? (
