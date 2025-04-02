@@ -13,10 +13,13 @@ import { captureRef } from "react-native-view-shot";
 import { shareAsync } from "expo-sharing";
 import * as Print from "expo-print";
 import { AppContext } from "../AppContext";
+import { auth } from "../firebaseConfig";
 
 export default function StatsScreen() {
   const { theme, language } = useContext(AppContext);
   const isDark = theme === "dark";
+  const user = auth.currentUser;
+  const uid = user?.uid;
 
   const [labels, setLabels] = useState([]);
   const [temperatures, setTemperatures] = useState([]);
@@ -27,7 +30,9 @@ export default function StatsScreen() {
   const chartRef = useRef();
 
   useEffect(() => {
-    const historyRef = ref(database, "history");
+    if (!uid) return;
+
+    const historyRef = ref(database, `users/${uid}/history`);
 
     const unsubscribe = onValue(historyRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -89,7 +94,7 @@ export default function StatsScreen() {
       case "pouls":
         return language === "fr" ? "Pouls (BPM)" : "Pulse (BPM)";
       case "spo2":
-        return language === "fr" ? "SpO2 (%)" : "SpO2 (%)";
+        return "SpO2 (%)";
     }
   };
 
@@ -131,7 +136,6 @@ export default function StatsScreen() {
         {language === "fr" ? "📊 Statistiques des relevés" : "📊 Recorded Statistics"}
       </Text>
 
-      {/* Sélecteur de période */}
       <View style={styles.periodSelector}>
         {["7j", "30j", "tout"].map((p) => (
           <TouchableOpacity
@@ -154,7 +158,6 @@ export default function StatsScreen() {
         ))}
       </View>
 
-      {/* Type de mesure */}
       <View style={styles.selector}>
         <TouchableOpacity
           onPress={() => setSelectedMetric("temperature")}
@@ -185,43 +188,42 @@ export default function StatsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Graphique */}
-      {labels.length > 0 && getData().length > 0 ? (
-        <View ref={chartRef} collapsable={false}>
-          <LineChart
-            data={{
-              labels: limitedLabels,
-              datasets: [{ data: getData() }],
-              legend: [getLabel()],
-            }}
-            width={Dimensions.get("window").width - 40}
-            height={260}
-            chartConfig={{
-              backgroundColor: "#fff",
-              backgroundGradientFrom: isDark ? "#222" : "#fff",
-              backgroundGradientTo: isDark ? "#222" : "#fff",
-              decimalPlaces: 1,
-              color: () => getColor(),
-              labelColor: () => (isDark ? "#fff" : "#000"),
-              propsForDots: {
-                r: "4",
-                strokeWidth: "2",
-                stroke: "#fff",
-              },
-            }}
-            bezier
-            style={{ marginVertical: 20, borderRadius: 16 }}
-          />
-        </View>
-      ) : (
-        <Text style={{ marginTop: 20, color: isDark ? "#aaa" : "gray" }}>
-          {language === "fr"
-            ? "Pas encore de données à afficher."
-            : "No data to display yet."}
-        </Text>
-      )}
+      {labels.length > 0 && getData().every((v) => typeof v === "number") ? (
+  <View ref={chartRef} collapsable={false}>
+    <LineChart
+      data={{
+        labels: limitedLabels,
+        datasets: [{ data: getData() }],
+        legend: [getLabel()],
+      }}
+      width={Dimensions.get("window").width - 40}
+      height={260}
+      chartConfig={{
+        backgroundColor: "#fff",
+        backgroundGradientFrom: isDark ? "#222" : "#fff",
+        backgroundGradientTo: isDark ? "#222" : "#fff",
+        decimalPlaces: 1,
+        color: () => getColor(),
+        labelColor: () => (isDark ? "#fff" : "#000"),
+        propsForDots: {
+          r: "4",
+          strokeWidth: "2",
+          stroke: "#fff",
+        },
+      }}
+      bezier
+      style={{ marginVertical: 20, borderRadius: 16 }}
+    />
+  </View>
+) : (
+  <Text style={{ marginTop: 20, color: isDark ? "#aaa" : "gray" }}>
+    {language === "fr"
+      ? "Pas encore de données à afficher."
+      : "No data to display yet."}
+  </Text>
+)}
 
-      {/* Export PDF */}
+
       <TouchableOpacity onPress={handleExportPDF} style={styles.exportBtn}>
         <Text style={styles.exportText}>
           📤 {language === "fr" ? "Exporter en PDF" : "Export as PDF"}

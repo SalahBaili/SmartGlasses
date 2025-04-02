@@ -17,29 +17,80 @@ import { database, ref, update, onValue, auth } from "../firebaseConfig";
 import { AppContext } from "../AppContext";
 
 export default function ProfileScreen() {
-  const [userInfo, setUserInfo] = useState({});
-  const [nameInput, setNameInput] = useState("");
-  const [editing, setEditing] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
-
   const { darkMode, language } = useContext(AppContext);
 
+  const [userInfo, setUserInfo] = useState({});
+  const [editing, setEditing] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
 
   const user = auth.currentUser;
   const uid = user?.uid;
 
+  const initialInputs = {
+    name: "",
+    sex: "",
+    age: "",
+    height: "",
+    weight: "",
+    conditions: "", // anciennement "allergies"
+  };
+
+  const [inputs, setInputs] = useState(initialInputs);
+
   useEffect(() => {
     const userRef = ref(database, `users/${uid}`);
     onValue(userRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
+
+        // Migration automatique si "allergies" existe
+        if (data.allergies && !data.conditions) {
+          update(userRef, { conditions: data.allergies });
+        }
+
         setUserInfo(data);
-        setNameInput(data.name || "");
+        setInputs({
+          name: data.name || "",
+          sex: data.sex || "",
+          age: data.age || "",
+          height: data.height || "",
+          weight: data.weight || "",
+          conditions: data.conditions || "",
+        });
       }
     });
   }, []);
+
+  const t = {
+    fr: {
+      name: "Nom",
+      sex: "Sexe",
+      male: "Homme",
+      female: "Femme",
+      age: "Âge",
+      height: "Taille (cm)",
+      weight: "Poids (kg)",
+      conditions: "Maladies antécédents",
+      edit: "✏️ Modifier le profil",
+      save: "💾 Enregistrer",
+      enter: "Entrez votre",
+    },
+    en: {
+      name: "Name",
+      sex: "Sex",
+      male: "Male",
+      female: "Female",
+      age: "Age",
+      height: "Height (cm)",
+      weight: "Weight (kg)",
+      conditions: "Medical Conditions",
+      edit: "✏️ Edit Profile",
+      save: "💾 Save",
+      enter: "Enter your",
+    },
+  }[language];
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -58,18 +109,11 @@ export default function ProfileScreen() {
   };
 
   const handleSave = async () => {
-    if (!nameInput.trim()) {
-      Alert.alert("Erreur", "Le nom ne peut pas être vide.");
-      return;
-    }
-
     try {
-      await update(ref(database, `users/${uid}`), {
-        name: nameInput.trim(),
-      });
+      await update(ref(database, `users/${uid}`), { ...inputs });
       animateSlideOut();
     } catch (error) {
-      Alert.alert("Erreur", "Impossible de mettre à jour le profil.");
+      Alert.alert("Erreur", "Échec de la mise à jour");
     }
   };
 
@@ -90,9 +134,7 @@ export default function ProfileScreen() {
       duration: 300,
       easing: Easing.in(Easing.ease),
       useNativeDriver: true,
-    }).start(() => {
-      setEditing(false);
-    });
+    }).start(() => setEditing(false));
   };
 
   const openModal = () => {
@@ -115,6 +157,77 @@ export default function ProfileScreen() {
     });
   };
 
+  const renderRow = (label, key, isTextInput = true) => {
+    const value = userInfo[key];
+    const displayValue =
+      typeof value === "object" ? JSON.stringify(value) : value || "—";
+    const placeholderText = `${t.enter} ${label.toLowerCase()}`;
+
+    return (
+      <View style={styles.infoRow}>
+        <Text style={[styles.label, darkMode && { color: "#bbb" }]}>
+          🔹 {label}
+        </Text>
+        {editing && isTextInput ? (
+          <TextInput
+            value={inputs[key]}
+            onChangeText={(text) => setInputs({ ...inputs, [key]: text })}
+            style={[
+              styles.input,
+              darkMode && { backgroundColor: "#222", color: "#fff" },
+            ]}
+            placeholder={placeholderText}
+            placeholderTextColor={darkMode ? "#aaa" : "#888"}
+          />
+        ) : (
+          <Text style={[styles.value, darkMode && { color: "#fff" }]}>
+            {displayValue}
+          </Text>
+        )}
+      </View>
+    );
+  };
+
+  const renderGenderSelector = () => (
+    <View style={styles.infoRow}>
+      <Text style={[styles.label, darkMode && { color: "#bbb" }]}>🧑‍🤝‍🧑 {t.sex}</Text>
+      {editing ? (
+        <View style={styles.genderSelector}>
+          <TouchableOpacity
+            style={[
+              styles.genderOption,
+              inputs.sex === "male" && styles.genderSelected,
+            ]}
+            onPress={() => setInputs({ ...inputs, sex: "male" })}
+          >
+            <Text style={{ color: inputs.sex === "male" ? "#fff" : "#000" }}>
+              {t.male}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.genderOption,
+              inputs.sex === "female" && styles.genderSelected,
+            ]}
+            onPress={() => setInputs({ ...inputs, sex: "female" })}
+          >
+            <Text style={{ color: inputs.sex === "female" ? "#fff" : "#000" }}>
+              {t.female}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <Text style={[styles.value, darkMode && { color: "#fff" }]}>
+          {userInfo.sex === "male"
+            ? t.male
+            : userInfo.sex === "female"
+            ? t.female
+            : "—"}
+        </Text>
+      )}
+    </View>
+  );
+
   return (
     <ScrollView
       contentContainerStyle={[
@@ -123,15 +236,7 @@ export default function ProfileScreen() {
       ]}
     >
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => {
-            if (editing) {
-              pickImage();
-            } else {
-              openModal();
-            }
-          }}
-        >
+        <TouchableOpacity onPress={() => (editing ? pickImage() : openModal())}>
           <Image
             source={
               userInfo.photo
@@ -141,36 +246,9 @@ export default function ProfileScreen() {
             style={styles.avatar}
           />
         </TouchableOpacity>
-
-        {!editing ? (
-          <>
-            <Text style={[styles.name, darkMode && { color: "#fff" }]}>
-              {userInfo.name || (language === "fr" ? "Utilisateur" : "User")}
-            </Text>
-            <Text style={[styles.email, darkMode && { color: "#ccc" }]}>
-              {auth.currentUser?.email}
-            </Text>
-          </>
-        ) : (
-          <Animated.View style={{ transform: [{ translateY: slideAnim }] }}>
-            <TextInput
-              value={nameInput}
-              onChangeText={setNameInput}
-              style={[
-                styles.input,
-                darkMode && {
-                  backgroundColor: "#222",
-                  color: "#fff",
-                  borderColor: "#666",
-                },
-              ]}
-              placeholder={
-                language === "fr" ? "Entrez votre nom" : "Enter your name"
-              }
-              placeholderTextColor={darkMode ? "#aaa" : "#888"}
-            />
-          </Animated.View>
-        )}
+        <Text style={[styles.name, darkMode && { color: "#fff" }]}>
+          {userInfo.name || "Utilisateur"}
+        </Text>
       </View>
 
       <View
@@ -179,35 +257,21 @@ export default function ProfileScreen() {
           darkMode && { backgroundColor: "#1e1e1e" },
         ]}
       >
-        <View style={styles.infoRow}>
-          <Text style={[styles.label, darkMode && { color: "#bbb" }]}>
-            👤 {language === "fr" ? "Nom" : "Name"}
-          </Text>
-          <Text style={[styles.value, darkMode && { color: "#fff" }]}>
-            {userInfo.name || "—"}
-          </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={[styles.label, darkMode && { color: "#bbb" }]}>
-            ✉️ Email
-          </Text>
-          <Text style={[styles.value, darkMode && { color: "#fff" }]}>
-            {auth.currentUser?.email}
-          </Text>
-        </View>
+        {renderRow(t.name, "name")}
+        {renderGenderSelector()}
+        {renderRow(t.age, "age")}
+        {renderRow(t.height, "height")}
+        {renderRow(t.weight, "weight")}
+        {renderRow(t.conditions, "conditions")}
       </View>
 
       {!editing ? (
         <TouchableOpacity style={styles.editBtn} onPress={animateSlideIn}>
-          <Text style={styles.editText}>
-            ✏️ {language === "fr" ? "Modifier le profil" : "Edit Profile"}
-          </Text>
+          <Text style={styles.editText}>{t.edit}</Text>
         </TouchableOpacity>
       ) : (
         <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-          <Text style={styles.saveText}>
-            💾 {language === "fr" ? "Enregistrer" : "Save"}
-          </Text>
+          <Text style={styles.saveText}>{t.save}</Text>
         </TouchableOpacity>
       )}
 
@@ -240,46 +304,29 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     padding: 20,
     alignItems: "center",
   },
   header: {
     alignItems: "center",
-    marginBottom: 30,
-    marginTop: 20,
+    marginBottom: 20,
   },
   avatar: {
     width: 110,
     height: 110,
     borderRadius: 55,
     backgroundColor: "#ddd",
-    marginBottom: 15,
+    marginBottom: 10,
   },
   name: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: "gray",
-  },
-  email: {
-    fontSize: 16,
-    color: "gray",
-  },
-  input: {
-    width: 200,
-    borderBottomWidth: 1,
-    borderColor: "#ccc",
     fontSize: 18,
-    padding: 5,
-    textAlign: "center",
-    color: "gray",
+    fontWeight: "bold",
   },
   infoSection: {
     width: "100%",
     backgroundColor: "#fff",
     borderRadius: 10,
     padding: 20,
-    elevation: 3,
     marginBottom: 20,
   },
   infoRow: {
@@ -294,29 +341,49 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  input: {
+    borderBottomWidth: 1,
+    borderColor: "#ccc",
+    fontSize: 16,
+    paddingVertical: 5,
+  },
+  genderSelector: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  genderOption: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    backgroundColor: "#eee",
+  },
+  genderSelected: {
+    backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
+  },
   editBtn: {
     backgroundColor: "#007AFF",
     padding: 12,
     borderRadius: 10,
-    width: "100%",
     alignItems: "center",
-  },
-  editText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
+    width: "100%",
   },
   saveBtn: {
     backgroundColor: "#34C759",
     padding: 12,
     borderRadius: 10,
-    width: "100%",
     alignItems: "center",
+    width: "100%",
+  },
+  editText: {
+    color: "#fff",
+    fontWeight: "bold",
   },
   saveText: {
     color: "#fff",
     fontWeight: "bold",
-    fontSize: 16,
   },
   modalBackground: {
     flex: 1,

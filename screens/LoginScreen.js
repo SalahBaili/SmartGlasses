@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { database, ref, set } from "../firebaseConfig";
+
 import {
   View,
   Text,
@@ -31,11 +33,29 @@ export default function LoginScreen({ navigation }) {
       Alert.alert("Erreur", "Veuillez entrer un email et un mot de passe !");
       return;
     }
-
+  
     setLoading(true);
     try {
       if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const uid = userCredential.user.uid;
+  
+        await set(ref(database, `users/${uid}`), {
+          info: { email },
+          sensorData: {
+            temperature: 0,
+            pouls: 0,
+            spo2: 0,
+          },
+          lastSavedData: {
+            temperature: 0,
+            pouls: 0,
+            spo2: 0,
+          },
+         
+         
+        });
+  
         Alert.alert("🎉 Compte créé !");
         setIsSignUp(false);
       } else {
@@ -43,10 +63,23 @@ export default function LoginScreen({ navigation }) {
         navigation.replace("AuthStack");
       }
     } catch (error) {
-      Alert.alert("Erreur", error.message);
+      let message = "Une erreur est survenue veuillez entrer le bon email ";
+    
+      if (
+        error.code === "auth/invalid-credential" || // Pour la majorité des erreurs Firebase modernes
+        error.code === "auth/user-not-found" ||
+        error.code === "auth/wrong-password"
+      ) {
+        message = "Email ou mot de passe est incorrect !";
+      }
+    
+      Alert.alert("Erreur", message);
     }
+  
     setLoading(false);
   };
+  
+      
 
   return (
     <KeyboardAvoidingView

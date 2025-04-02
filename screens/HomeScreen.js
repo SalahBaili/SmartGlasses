@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef, useContext } from "react";
+
+
 import {
   View,
   Text,
@@ -9,7 +11,9 @@ import {
   Alert,
   Animated,
 } from "react-native";
-import { auth, database, ref, onValue, push, update } from "../firebaseConfig";
+import { auth, database } from "../firebaseConfig";
+import { ref, onValue, push, update, set } from "firebase/database";
+
 import { signOut } from "firebase/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { AppContext } from "../AppContext";
@@ -30,44 +34,47 @@ export default function HomeScreen({ navigation }) {
   const uid = user?.uid;
 
   useEffect(() => {
+    if (!uid) return;
+  
     const userRef = ref(database, `users/${uid}`);
-    const dataRef = ref(database, "sensorData");
-    const historyRef = ref(database, "history");
+    const dataRef = ref(database, `users/${uid}/sensorData`);
+    const historyRef = ref(database, `users/${uid}/history`);
     const lastSavedRef = ref(database, `users/${uid}/lastSavedData`);
-
+  
     let initialLoad = true;
-
+  
     onValue(lastSavedRef, (snap) => {
       if (snap.exists()) {
         setLastSavedData(snap.val());
       }
     });
-
+  
     onValue(dataRef, (snap) => {
       if (snap.exists()) {
         const newData = snap.val();
         setData(newData);
-
+  
         if (initialLoad || !lastSavedData) {
           initialLoad = false;
           return;
         }
-
+  
         const changed =
           newData.temperature !== lastSavedData.temperature ||
           newData.pouls !== lastSavedData.pouls ||
           newData.spo2 !== lastSavedData.spo2;
-
+  
         if (changed) {
-          push(historyRef, {
+          const newEntryRef = push(historyRef);
+          set(newEntryRef, {
             ...newData,
             timestamp: new Date().toISOString(),
           });
-
-          update(ref(database, `users/${uid}`), {
+  
+          update(userRef, {
             lastSavedData: newData,
           });
-
+  
           setLastSavedData(newData);
           setShowBadge(true);
           Animated.timing(badgeOpacity, {
@@ -86,14 +93,14 @@ export default function HomeScreen({ navigation }) {
         }
       }
     });
-
+  
     onValue(userRef, (snap) => {
       if (snap.exists()) {
         setUserInfo(snap.val());
       }
     });
-
-    onValue(ref(database, "history"), (snapshot) => {
+  
+    onValue(historyRef, (snapshot) => {
       if (snapshot.exists()) {
         const values = Object.values(snapshot.val()).filter((v) => !v.archived);
         const count = values.length;
@@ -113,11 +120,17 @@ export default function HomeScreen({ navigation }) {
       }
     });
   }, []);
-
+  
   const handleLogout = async () => {
     await signOut(auth);
     navigation.replace("Login");
   };
+  const getDisplayName = () => {
+    if (userInfo.name) return userInfo.name;
+    if (user?.email) return user.email.split("@")[0]; // Extrait le nom avant le @
+    return "Utilisateur";
+  };
+  
 
   const isAlert = (temp, spo2, pouls) => {
     return temp > 38 || temp < 35 || spo2 < 90 || pouls < 50 || pouls > 120;
@@ -139,12 +152,15 @@ export default function HomeScreen({ navigation }) {
 
       {/* Info Utilisateur */}
       <View style={styles.header}>
-        <View>
-          <Text style={[styles.welcome, { color: colors.subtext }]}>{t.welcome}</Text>
-          <Text style={[styles.username, { color: colors.text }]}>
-            {userInfo.name || user?.email || "Utilisateur"}
-          </Text>
-        </View>
+  <View>
+    <Text style={[styles.welcome, { color: colors.subtext }]}>
+      {t.welcome}
+    </Text>
+    <Text style={[styles.username, { color: colors.text }]}>
+      {getDisplayName()}
+    </Text>
+  </View>
+
 
         <TouchableOpacity onPress={() => navigation.navigate("Profil")}>
           <Image
