@@ -55,13 +55,12 @@ export default function HomeScreen({ navigation }) {
 
   const handleExportLastFive = async () => {
     Alert.alert(
-      t.title,
+      t.title, // dynamique selon la langue
       t.message,
       [
         { text: t.cancel, style: "cancel" },
         {
           text: t.confirm,
-    
           onPress: async () => {
             const historyRef = ref(database, `users/${uid}/history`);
             const snapshot = await get(historyRef);
@@ -95,6 +94,7 @@ export default function HomeScreen({ navigation }) {
       ]
     );
   };
+  
   
 
   useEffect(() => {
