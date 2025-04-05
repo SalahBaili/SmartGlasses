@@ -1,6 +1,4 @@
 import React, { useEffect, useState, useRef, useContext } from "react";
-
-
 import {
   View,
   Text,
@@ -12,11 +10,12 @@ import {
   Animated,
 } from "react-native";
 import { auth, database } from "../firebaseConfig";
-import { ref, onValue, push, update, set } from "firebase/database";
-
+import { ref, onValue, push, update, set, get } from "firebase/database";
 import { signOut } from "firebase/auth";
-import { Ionicons } from "@expo/vector-icons";
 import { AppContext } from "../AppContext";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import { Accelerometer } from "expo-sensors";
 
 export default function HomeScreen({ navigation }) {
   const { theme, language } = useContext(AppContext);
@@ -33,48 +32,113 @@ export default function HomeScreen({ navigation }) {
   const user = auth.currentUser;
   const uid = user?.uid;
 
+  // Shake detector 🚨
+  useEffect(() => {
+    let lastShakeTime = 0;
+
+    const subscription = Accelerometer.addListener(({ x, y, z }) => {
+      const now = Date.now();
+      const speed = Math.sqrt(x * x + y * y + z * z);
+
+      if (speed > 2 && now - lastShakeTime > 2000) {
+        lastShakeTime = now;
+        handleExportLastFive(); // 👈 export on shake
+      }
+    });
+
+    Accelerometer.setUpdateInterval(300);
+
+    return () => {
+      subscription && subscription.remove();
+    };
+  }, []);
+
+  const handleExportLastFive = async () => {
+    Alert.alert(
+      t.title,
+      t.message,
+      [
+        { text: t.cancel, style: "cancel" },
+        {
+          text: t.confirm,
+    
+          onPress: async () => {
+            const historyRef = ref(database, `users/${uid}/history`);
+            const snapshot = await get(historyRef);
+            if (!snapshot.exists()) return;
+  
+            const allData = Object.values(snapshot.val())
+              .filter((entry) => !entry.archived)
+              .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  
+            const lastFive = allData.slice(0, 5);
+  
+            const csv = [
+              "Date,Température,SpO2,Pouls",
+              ...lastFive.map((e) => {
+                const d = new Date(e.timestamp);
+                const date = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1)
+                  .toString()
+                  .padStart(2, "0")}/${d.getFullYear()}`;
+                return `${date},${e.temperature},${e.spo2},${e.pouls}`;
+              }),
+            ].join("\n");
+  
+            const fileUri = FileSystem.documentDirectory + "last_five_data.csv";
+            await FileSystem.writeAsStringAsync(fileUri, csv, {
+              encoding: FileSystem.EncodingType.UTF8,
+            });
+  
+            await Sharing.shareAsync(fileUri);
+          },
+        },
+      ]
+    );
+  };
+  
+
   useEffect(() => {
     if (!uid) return;
-  
+
     const userRef = ref(database, `users/${uid}`);
     const dataRef = ref(database, `users/${uid}/sensorData`);
     const historyRef = ref(database, `users/${uid}/history`);
     const lastSavedRef = ref(database, `users/${uid}/lastSavedData`);
-  
+
     let initialLoad = true;
-  
+
     onValue(lastSavedRef, (snap) => {
       if (snap.exists()) {
         setLastSavedData(snap.val());
       }
     });
-  
+
     onValue(dataRef, (snap) => {
       if (snap.exists()) {
         const newData = snap.val();
         setData(newData);
-  
+
         if (initialLoad || !lastSavedData) {
           initialLoad = false;
           return;
         }
-  
+
         const changed =
           newData.temperature !== lastSavedData.temperature ||
           newData.pouls !== lastSavedData.pouls ||
           newData.spo2 !== lastSavedData.spo2;
-  
+
         if (changed) {
           const newEntryRef = push(historyRef);
           set(newEntryRef, {
             ...newData,
             timestamp: new Date().toISOString(),
           });
-  
+
           update(userRef, {
             lastSavedData: newData,
           });
-  
+
           setLastSavedData(newData);
           setShowBadge(true);
           Animated.timing(badgeOpacity, {
@@ -93,13 +157,13 @@ export default function HomeScreen({ navigation }) {
         }
       }
     });
-  
+
     onValue(userRef, (snap) => {
       if (snap.exists()) {
         setUserInfo(snap.val());
       }
     });
-  
+
     onValue(historyRef, (snapshot) => {
       if (snapshot.exists()) {
         const values = Object.values(snapshot.val()).filter((v) => !v.archived);
@@ -120,19 +184,20 @@ export default function HomeScreen({ navigation }) {
       }
     });
   }, []);
-  
+
   const handleLogout = async () => {
     await signOut(auth);
     navigation.replace("Login");
   };
+
   const getDisplayName = () => {
     if (userInfo.name) return userInfo.name;
-    if (user?.email) return user.email.split("@")[0]; // Extrait le nom avant le @
+    if (user?.email) return user.email.split("@")[0];
     return "Utilisateur";
   };
-  
 
   const isAlert = (temp, spo2, pouls) => {
+    if (!temp || !spo2 || !pouls) return false;
     return temp > 38 || temp < 35 || spo2 < 90 || pouls < 50 || pouls > 120;
   };
 
@@ -144,24 +209,11 @@ export default function HomeScreen({ navigation }) {
         </Animated.View>
       )}
 
-      {/* Header avec Paramètres */}
-      <View style={styles.topBar}>
-        <Text style={[styles.pageTitle, { color: colors.text }]}>{t.home}</Text>
-
-      </View>
-
-      {/* Info Utilisateur */}
       <View style={styles.header}>
-  <View>
-    <Text style={[styles.welcome, { color: colors.subtext }]}>
-      {t.welcome}
-    </Text>
-    <Text style={[styles.username, { color: colors.text }]}>
-      {getDisplayName()}
-    </Text>
-  </View>
-
-
+        <View>
+          <Text style={[styles.welcome, { color: colors.subtext }]}>{t.welcome}</Text>
+          <Text style={[styles.username, { color: colors.text }]}>{getDisplayName()}</Text>
+        </View>
         <TouchableOpacity onPress={() => navigation.navigate("Profil")}>
           <Image
             source={
@@ -174,7 +226,6 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Cartes */}
       <View style={styles.cardContainer}>
         <Card title={t.temperature} value={`${data.temperature} °C`} color="#007AFF" />
         <Card title={t.pulse} value={`${data.pouls} BPM`} color="#FF3B30" />
@@ -190,7 +241,15 @@ export default function HomeScreen({ navigation }) {
 
       {isAlert(data.temperature, data.spo2, data.pouls) && (
         <View style={styles.alertBox}>
-          <Text style={styles.alertText}>⚠️ {t.alert}</Text>
+          <Text style={styles.alertText}>
+            ⚠️ {t.alert}{" "}
+            <Text
+              style={{ color: "#007AFF", textDecorationLine: "underline" }}
+              onPress={() => navigation.navigate("Doctors")}
+            >
+              {t.consult}
+            </Text>
+          </Text>
         </View>
       )}
 
@@ -231,43 +290,51 @@ const darkTheme = {
 };
 
 const translations = {
-  fr: { 
+  fr: {
+    home: "Accueil",
     welcome: "Bienvenue",
     temperature: "🌡️ Température",
     pulse: "💓 Pouls",
     spo2: "🫁 SpO2",
     averages: "📊 Moyennes générales",
-    alert: "Valeur(s) anormale(s) détectée(s). Consultez un médecin.",
+    alert: "Valeur(s) anormale(s) détectée(s).",
+    consult: "Consultez un médecin.",
     history: "Historique",
     stats: "Statistiques",
     logout: "Déconnexion",
     saved: "Mesure enregistrée",
+    assistant: "Assistant",
+    title: "Alerte !!",
+      message: "Voulez-vous exporter les 5 dernières mesures ?",
+      cancel: "Annuler",
+      confirm: "Exporter",
   },
   en: {
+    home: "Home",
     welcome: "Welcome",
     temperature: "🌡️ Temperature",
     pulse: "💓 Pulse",
     spo2: "🫁 SpO2",
     averages: "📊 Averages",
-    alert: "Abnormal value(s) detected. See a doctor.",
+    alert: "Abnormal value(s) detected.",
+    consult: "See a doctor.",
     history: "History",
     stats: "Statistics",
     logout: "Logout",
     saved: "Saved",
+    assistant: "Assistant",
+    title: "Alert",
+      message: "Do you want to export the last 5 measurements?",
+      cancel: "Cancel",
+      confirm: "Export",
   },
 };
 
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    backgroundColor: "#F5F5F5",
     alignItems: "center",
   },
-  headerRight: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  
   header: {
     width: "100%",
     flexDirection: "row",
@@ -277,7 +344,6 @@ const styles = StyleSheet.create({
   },
   welcome: {
     fontSize: 16,
-    color: "gray",
   },
   username: {
     fontSize: 22,
@@ -309,7 +375,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     marginTop: 5,
-    color: "#007AFF",
   },
   subtitle: {
     fontSize: 18,

@@ -76,3 +76,7 @@ yarn-error.*
 *.tsbuildinfo
 
 # @end expo-cli
+
+# Pour ne jamais pousser ta clé API sur GitHub !
+
+.env

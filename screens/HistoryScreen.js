@@ -41,7 +41,7 @@ export default function HistoryScreen() {
     fr: {
       export: "📤 Exporter",
       back: "⬅️ Retour aux mesures",
-      archive: "🗃️ Archiver",
+      archive: "🗃️ Archiver ",
       start: "📅 Début",
       end: "📅 Fin",
       reset: "🔄",
@@ -287,7 +287,8 @@ export default function HistoryScreen() {
                 </Text>
               </TouchableOpacity>
   
-              <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
+  <Text style={{ fontSize: 20, color: darkMode ? "#fff" : "#000" }}>🔍</Text>
                 <TouchableOpacity onPress={() => setShowStartPicker(true)} style={styles.dateBtn}>
                   <Text style={[styles.dateText, darkMode && styles.dateTextDark]}>{t.start}</Text>
                 </TouchableOpacity>

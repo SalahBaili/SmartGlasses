@@ -1,14 +1,38 @@
 import { createDrawerNavigator } from "@react-navigation/drawer";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useContext } from "react";
+import { TouchableOpacity, Text } from "react-native";
+import ChatScreen from "../screens/ChatScreen";
 import HomeScreen from "../screens/HomeScreen";
 import StatsScreen from "../screens/StatsScreen";
 import HistoryScreen from "../screens/HistoryScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import SettingsScreen from "../screens/SettingsScreen";
-import { useContext } from "react";
-import { AppContext } from "../AppContext";
-import { TouchableOpacity, Text } from "react-native";
+import AssistantScreen from "../screens/AssistantScreen";
+import DoctorsScreen from "../screens/DoctorsScreen";
 
+import { AppContext } from "../AppContext";
+
+// Création des navigateurs
 const Drawer = createDrawerNavigator();
+const Stack = createNativeStackNavigator();
+
+// ⚙️ Ce Stack contiendra Home + Doctors
+function MainStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerTitleAlign: "center" }}>
+      <Drawer.Screen
+  name="Home"
+  component={HomeScreen}
+  options={{
+    headerShown: false, // 👈 cache complètement la barre du haut
+  }}
+/>
+
+      <Stack.Screen name="Doctors" component={DoctorsScreen} options={{ title: "Médecins" }} />
+    </Stack.Navigator>
+  );
+}
 
 export default function AppDrawer() {
   const { language } = useContext(AppContext);
@@ -26,7 +50,7 @@ export default function AppDrawer() {
       screenOptions={({ navigation }) => ({
         headerRight: () => (
           <TouchableOpacity
-            onPress={() => navigation.navigate("Settings")} // 👈 Le nom du screen
+            onPress={() => navigation.navigate("Settings")}
             style={{ marginRight: 15 }}
           >
             <Text style={{ fontSize: 20 }}>⚙️</Text>
@@ -35,11 +59,13 @@ export default function AppDrawer() {
         headerTitleAlign: "center",
       })}
     >
-      <Drawer.Screen name="Home" component={HomeScreen} options={{ title: labels.home }} />
+      {/* Utilisation de MainStack au lieu de Home directement */}
+      <Drawer.Screen name="Main" component={MainStack} options={{ title: labels.home }} />
       <Drawer.Screen name="Statistiques" component={StatsScreen} options={{ title: labels.stats }} />
       <Drawer.Screen name="Historique" component={HistoryScreen} options={{ title: labels.history }} />
       <Drawer.Screen name="Profil" component={ProfileScreen} options={{ title: labels.profile }} />
       <Drawer.Screen name="Settings" component={SettingsScreen} options={{ title: labels.settings }} />
+      <Drawer.Screen name="Assistant" component={AssistantScreen} options={{ title: "Assistant 🤖" }} />
     </Drawer.Navigator>
   );
 }
