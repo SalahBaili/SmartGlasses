@@ -1,157 +1,152 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
   StyleSheet,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
+  ScrollView,
 } from "react-native";
-import { OPENAI_API_KEY } from "@env";
-const API_KEY = OPENAI_API_KEY;
+import { AppContext } from "../AppContext";
 
 export default function AssistantScreen() {
-  const [messages, setMessages] = useState([]);
+  const { theme, language } = useContext(AppContext);
   const [input, setInput] = useState("");
+  const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const sendMessage = async () => {
+  const colors = theme === "dark" ? darkTheme : lightTheme;
+  const t = translations[language];
+
+  const handleAsk = async () => {
     if (!input.trim()) return;
-
-    if (!API_KEY) {
-      Alert.alert("Erreur", "La clé API OpenAI est manquante.");
-      return;
-    }
-
-    const userMessage = { role: "user", content: input };
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
-    setInput("");
+  
     setLoading(true);
-
+    setResponse("");
+  
     try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${API_KEY}`,
+          Authorization: "Bearer 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", // ← Ton token ici
+          "HTTP-Referer": "https://mon-assistant-ia-mobile.com", // ← URL de ton projet ou app (important pour OpenRouter)
         },
         body: JSON.stringify({
-          model: "gpt-3.5-turbo",
-          messages: newMessages,
+          model: "mistralai/mistral-7b-instruct", // ou "openai/gpt-3.5-turbo"
+          messages: [
+            { role: "system", content: "Tu es un assistant intelligent qui parle français." },
+            { role: "user", content: input }
+          ]
         }),
       });
-
-      const data = await response.json();
-
-      if (!data.choices || !data.choices[0]) {
-        console.log("Réponse invalide de l'API:", data);
-        Alert.alert("Erreur", "Réponse invalide de l'Assistant.");
-        return;
+  
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Erreur HTTP ${res.status} : ${errorText}`);
       }
-
-      const assistantReply = data.choices[0].message;
-      setMessages([...newMessages, assistantReply]);
+  
+      const data = await res.json();
+      const reply = data.choices?.[0]?.message?.content || "Pas de réponse.";
+      setResponse(reply);
     } catch (error) {
-      console.log("Erreur GPT:", error);
-      Alert.alert("Erreur", "Une erreur est survenue lors de l'appel à l'Assistant.");
+      console.error("Erreur OpenRouter :", error);
+      setResponse("Erreur : " + error.message);
     } finally {
       setLoading(false);
     }
   };
-
-  const renderItem = ({ item }) => (
-    <View
-      style={[
-        styles.message,
-        item.role === "user" ? styles.user : styles.assistant,
-      ]}
-    >
-      <Text style={styles.text}>{item.content}</Text>
-    </View>
-  );
+  
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={styles.container}
-    >
-      <FlatList
-        data={messages}
-        renderItem={renderItem}
-        keyExtractor={(_, index) => index.toString()}
-        contentContainerStyle={styles.chatContainer}
+    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.title, { color: colors.text }]}>{t.title}</Text>
+      <TextInput
+        style={[styles.input, { backgroundColor: colors.inputBg, color: colors.text }]}
+        placeholder={t.placeholder}
+        placeholderTextColor={colors.placeholder}
+        value={input}
+        onChangeText={setInput}
+        multiline
       />
+      <TouchableOpacity style={[styles.button, { backgroundColor: "#007AFF" }]} onPress={handleAsk}>
+        <Text style={styles.buttonText}>{t.ask}</Text>
+      </TouchableOpacity>
 
-      {loading && (
-        <ActivityIndicator
-          size="small"
-          color="#007AFF"
-          style={{ marginBottom: 10 }}
-        />
+      {loading ? (
+        <ActivityIndicator size="large" color="#007AFF" style={{ marginTop: 20 }} />
+      ) : (
+        response !== "" && (
+          <View style={[styles.responseBox, { borderColor: colors.text }]}>
+            <Text style={{ color: colors.text }}>{response}</Text>
+          </View>
+        )
       )}
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          value={input}
-          onChangeText={setInput}
-          style={styles.input}
-          placeholder="Écrivez un message..."
-          placeholderTextColor="#aaa"
-        />
-        <TouchableOpacity onPress={sendMessage} style={styles.sendBtn}>
-          <Text style={styles.sendText}>📤</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+    </ScrollView>
   );
 }
 
+const lightTheme = {
+  background: "#F5F5F5",
+  text: "#000",
+  inputBg: "#fff",
+  placeholder: "#999",
+};
+
+const darkTheme = {
+  background: "#1c1c1e",
+  text: "#f0f0f0",
+  inputBg: "#333",
+  placeholder: "#888",
+};
+
+const translations = {
+  fr: {
+    title: "Assistant IA",
+    placeholder: "Posez une question...",
+    ask: "Demander",
+  },
+  en: {
+    title: "AI Assistant",
+    placeholder: "Ask a question...",
+    ask: "Ask",
+  },
+};
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9f9f9" },
-  chatContainer: {
-    padding: 16,
+  container: {
+    padding: 20,
+    flexGrow: 1,
   },
-  message: {
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 8,
-    maxWidth: "80%",
-  },
-  user: {
-    backgroundColor: "#007AFF",
-    alignSelf: "flex-end",
-  },
-  assistant: {
-    backgroundColor: "#eee",
-    alignSelf: "flex-start",
-  },
-  text: {
-    color: "#000",
-  },
-  inputContainer: {
-    flexDirection: "row",
-    padding: 10,
-    borderTopWidth: 1,
-    borderColor: "#ccc",
-    backgroundColor: "#fff",
+  title: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 15,
+    textAlign: "center",
   },
   input: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: "#f1f1f1",
-    borderRadius: 20,
-    marginRight: 10,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 15,
+    fontSize: 16,
+    minHeight: 100,
   },
-  sendBtn: {
-    justifyContent: "center",
+  button: {
+    marginTop: 15,
+    padding: 15,
+    borderRadius: 10,
     alignItems: "center",
   },
-  sendText: {
-    fontSize: 24,
+  buttonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  responseBox: {
+    marginTop: 20,
+    padding: 15,
+    borderWidth: 1,
+    borderRadius: 10,
   },
 });
