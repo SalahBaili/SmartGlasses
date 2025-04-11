@@ -29,8 +29,8 @@ export default function AssistantScreen() {
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer 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", // ← Ton token ici
+          "Content-Type": "application/json",  
+          Authorization: "Bearer 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", 
           "HTTP-Referer": "https://mon-assistant-ia-mobile.com", // ← URL de ton projet ou app (important pour OpenRouter)
         },
         body: JSON.stringify({
