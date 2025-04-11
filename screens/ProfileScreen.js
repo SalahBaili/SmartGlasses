@@ -16,9 +16,29 @@ import * as ImagePicker from "expo-image-picker";
 import { database, ref, update, onValue, auth } from "../firebaseConfig";
 import { AppContext } from "../AppContext";
 
-export default function ProfileScreen() {
-  const { darkMode, language } = useContext(AppContext);
+// Thèmes
+const lightTheme = {
+  background: "#ffffff",
+  card: "#ffffff",
+  text: "#000000",
+  label: "#888888",
+  inputBackground: "#eeeeee",
+  buttonText: "#ffffff",
+};
 
+const darkTheme = {
+  background: "#121212",
+  card: "#1e1e1e",
+  text: "#ffffff",
+  label: "#bbbbbb",
+  inputBackground: "#222222",
+  buttonText: "#ffffff",
+};
+
+export default function ProfileScreen() {
+  const { theme, language } = useContext(AppContext);
+  const isDark = theme === "dark";
+  const colors = isDark ? darkTheme : lightTheme;
   const [userInfo, setUserInfo] = useState({});
   const [editing, setEditing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -34,34 +54,10 @@ export default function ProfileScreen() {
     age: "",
     height: "",
     weight: "",
-    conditions: "", // anciennement "allergies"
+    conditions: "",
   };
 
   const [inputs, setInputs] = useState(initialInputs);
-
-  useEffect(() => {
-    const userRef = ref(database, `users/${uid}`);
-    onValue(userRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-
-        // Migration automatique si "allergies" existe
-        if (data.allergies && !data.conditions) {
-          update(userRef, { conditions: data.allergies });
-        }
-
-        setUserInfo(data);
-        setInputs({
-          name: data.name || "",
-          sex: data.sex || "",
-          age: data.age || "",
-          height: data.height || "",
-          weight: data.weight || "",
-          conditions: data.conditions || "",
-        });
-      }
-    });
-  }, []);
 
   const t = {
     fr: {
@@ -92,6 +88,26 @@ export default function ProfileScreen() {
     },
   }[language];
 
+  useEffect(() => {
+    const userRef = ref(database, `users/${uid}`);
+    onValue(userRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        if (data.allergies && !data.conditions) {
+          update(userRef, { conditions: data.allergies });
+        }
+        setUserInfo(data);
+        setInputs({
+          name: data.name || "",
+          sex: data.sex || "",
+          age: data.age || "",
+          height: data.height || "",
+          weight: data.weight || "",
+          conditions: data.conditions || "",
+        });
+      }
+    });
+  }, []);
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -112,7 +128,7 @@ export default function ProfileScreen() {
     try {
       await update(ref(database, `users/${uid}`), { ...inputs });
       animateSlideOut();
-    } catch (error) {
+    } catch {
       Alert.alert("Erreur", "Échec de la mise à jour");
     }
   };
@@ -137,52 +153,24 @@ export default function ProfileScreen() {
     }).start(() => setEditing(false));
   };
 
-  const openModal = () => {
-    setModalVisible(true);
-    fadeAnim.setValue(0);
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const closeModal = () => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      setModalVisible(false);
-    });
-  };
-
   const renderRow = (label, key, isTextInput = true) => {
     const value = userInfo[key];
-    const displayValue =
-      typeof value === "object" ? JSON.stringify(value) : value || "—";
-    const placeholderText = `${t.enter} ${label.toLowerCase()}`;
+    const displayValue = value || "—";
+    const placeholder = `${t.enter} ${label.toLowerCase()}`;
 
     return (
       <View style={styles.infoRow}>
-        <Text style={[styles.label, darkMode && { color: "#bbb" }]}>
-          🔹 {label}
-        </Text>
+        <Text style={[styles.label, { color: colors.label }]}>🔹 {label}</Text>
         {editing && isTextInput ? (
           <TextInput
             value={inputs[key]}
             onChangeText={(text) => setInputs({ ...inputs, [key]: text })}
-            style={[
-              styles.input,
-              darkMode && { backgroundColor: "#222", color: "#fff" },
-            ]}
-            placeholder={placeholderText}
-            placeholderTextColor={darkMode ? "#aaa" : "#888"}
+            style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
+            placeholder={placeholder}
+            placeholderTextColor={isDark ? "#aaa" : "#666"}
           />
         ) : (
-          <Text style={[styles.value, darkMode && { color: "#fff" }]}>
-            {displayValue}
-          </Text>
+          <Text style={{ color: colors.text }}>{displayValue}</Text>
         )}
       </View>
     );
@@ -190,34 +178,29 @@ export default function ProfileScreen() {
 
   const renderGenderSelector = () => (
     <View style={styles.infoRow}>
-      <Text style={[styles.label, darkMode && { color: "#bbb" }]}>🧑‍🤝‍🧑 {t.sex}</Text>
+      <Text style={[styles.label, { color: colors.label }]}>🧑‍🤝‍🧑 {t.sex}</Text>
       {editing ? (
         <View style={styles.genderSelector}>
-          <TouchableOpacity
-            style={[
-              styles.genderOption,
-              inputs.sex === "male" && styles.genderSelected,
-            ]}
-            onPress={() => setInputs({ ...inputs, sex: "male" })}
-          >
-            <Text style={{ color: inputs.sex === "male" ? "#fff" : "#000" }}>
-              {t.male}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.genderOption,
-              inputs.sex === "female" && styles.genderSelected,
-            ]}
-            onPress={() => setInputs({ ...inputs, sex: "female" })}
-          >
-            <Text style={{ color: inputs.sex === "female" ? "#fff" : "#000" }}>
-              {t.female}
-            </Text>
-          </TouchableOpacity>
+          {["male", "female"].map((gender) => (
+            <TouchableOpacity
+              key={gender}
+              style={[
+                styles.genderOption,
+                inputs.sex === gender && styles.genderSelected,
+              ]}
+              onPress={() => setInputs({ ...inputs, sex: gender })}
+            >
+              <Text style={{
+                color: inputs.sex === gender ? "#fff" : "#000",
+                fontWeight: "bold"
+              }}>
+                {t[gender]}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       ) : (
-        <Text style={[styles.value, darkMode && { color: "#fff" }]}>
+        <Text style={{ color: colors.text }}>
           {userInfo.sex === "male"
             ? t.male
             : userInfo.sex === "female"
@@ -229,14 +212,9 @@ export default function ProfileScreen() {
   );
 
   return (
-    <ScrollView
-      contentContainerStyle={[
-        styles.container,
-        darkMode && { backgroundColor: "#121212" },
-      ]}
-    >
+    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => (editing ? pickImage() : openModal())}>
+        <TouchableOpacity onPress={() => (editing ? pickImage() : setModalVisible(true))}>
           <Image
             source={
               userInfo.photo
@@ -246,17 +224,12 @@ export default function ProfileScreen() {
             style={styles.avatar}
           />
         </TouchableOpacity>
-        <Text style={[styles.name, darkMode && { color: "#fff" }]}>
+        <Text style={[styles.name, { color: colors.text }]}>
           {userInfo.name || "Utilisateur"}
         </Text>
       </View>
 
-      <View
-        style={[
-          styles.infoSection,
-          darkMode && { backgroundColor: "#1e1e1e" },
-        ]}
-      >
+      <View style={[styles.infoSection, { backgroundColor: colors.card }]}>
         {renderRow(t.name, "name")}
         {renderGenderSelector()}
         {renderRow(t.age, "age")}
@@ -275,11 +248,10 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       )}
 
-      <Modal visible={modalVisible} transparent animationType="none">
+      <Modal visible={modalVisible} transparent animationType="fade">
         <TouchableOpacity
           style={styles.modalBackground}
-          onPress={closeModal}
-          activeOpacity={1}
+          onPress={() => setModalVisible(false)}
         >
           <Animated.Image
             source={
@@ -287,13 +259,7 @@ export default function ProfileScreen() {
                 ? { uri: userInfo.photo }
                 : require("../assets/avatar-placeholder.png")
             }
-            style={[
-              styles.fullImage,
-              {
-                opacity: fadeAnim,
-                transform: [{ scale: fadeAnim }],
-              },
-            ]}
+            style={[styles.fullImage, { opacity: fadeAnim, transform: [{ scale: fadeAnim }] }]}
             resizeMode="contain"
           />
         </TouchableOpacity>
@@ -324,7 +290,6 @@ const styles = StyleSheet.create({
   },
   infoSection: {
     width: "100%",
-    backgroundColor: "#fff",
     borderRadius: 10,
     padding: 20,
     marginBottom: 20,
@@ -333,19 +298,15 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   label: {
-    color: "#888",
     marginBottom: 5,
     fontSize: 14,
-  },
-  value: {
-    fontSize: 16,
-    fontWeight: "600",
   },
   input: {
     borderBottomWidth: 1,
     borderColor: "#ccc",
     fontSize: 16,
     paddingVertical: 5,
+    borderRadius: 5,
   },
   genderSelector: {
     flexDirection: "row",

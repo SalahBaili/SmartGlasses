@@ -32,70 +32,58 @@ export default function HomeScreen({ navigation }) {
   const user = auth.currentUser;
   const uid = user?.uid;
 
-  // Shake detector 🚨
   useEffect(() => {
     let lastShakeTime = 0;
-
     const subscription = Accelerometer.addListener(({ x, y, z }) => {
       const now = Date.now();
       const speed = Math.sqrt(x * x + y * y + z * z);
-
       if (speed > 2 && now - lastShakeTime > 2000) {
         lastShakeTime = now;
-        handleExportLastFive(); // 👈 export on shake
+        handleExportLastFive();
       }
     });
 
     Accelerometer.setUpdateInterval(300);
-
-    return () => {
-      subscription && subscription.remove();
-    };
+    return () => subscription && subscription.remove();
   }, []);
 
   const handleExportLastFive = async () => {
-    Alert.alert(
-      t.title, // dynamique selon la langue
-      t.message,
-      [
-        { text: t.cancel, style: "cancel" },
-        {
-          text: t.confirm,
-          onPress: async () => {
-            const historyRef = ref(database, `users/${uid}/history`);
-            const snapshot = await get(historyRef);
-            if (!snapshot.exists()) return;
-  
-            const allData = Object.values(snapshot.val())
-              .filter((entry) => !entry.archived)
-              .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  
-            const lastFive = allData.slice(0, 5);
-  
-            const csv = [
-              "Date,Température,SpO2,Pouls",
-              ...lastFive.map((e) => {
-                const d = new Date(e.timestamp);
-                const date = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1)
-                  .toString()
-                  .padStart(2, "0")}/${d.getFullYear()}`;
-                return `${date},${e.temperature},${e.spo2},${e.pouls}`;
-              }),
-            ].join("\n");
-  
-            const fileUri = FileSystem.documentDirectory + "last_five_data.csv";
-            await FileSystem.writeAsStringAsync(fileUri, csv, {
-              encoding: FileSystem.EncodingType.UTF8,
-            });
-  
-            await Sharing.shareAsync(fileUri);
-          },
+    Alert.alert(t.title, t.message, [
+      { text: t.cancel, style: "cancel" },
+      {
+        text: t.confirm,
+        onPress: async () => {
+          const historyRef = ref(database, `users/${uid}/history`);
+          const snapshot = await get(historyRef);
+          if (!snapshot.exists()) return;
+
+          const allData = Object.values(snapshot.val())
+            .filter((entry) => !entry.archived)
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+          const lastFive = allData.slice(0, 5);
+
+          const csv = [
+            "Date,Température,SpO2,Pouls",
+            ...lastFive.map((e) => {
+              const d = new Date(e.timestamp);
+              const date = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1)
+                .toString()
+                .padStart(2, "0")}/${d.getFullYear()}`;
+              return `${date},${e.temperature},${e.spo2},${e.pouls}`;
+            }),
+          ].join("\n");
+
+          const fileUri = FileSystem.documentDirectory + "last_five_data.csv";
+          await FileSystem.writeAsStringAsync(fileUri, csv, {
+            encoding: FileSystem.EncodingType.UTF8,
+          });
+
+          await Sharing.shareAsync(fileUri);
         },
-      ]
-    );
+      },
+    ]);
   };
-  
-  
 
   useEffect(() => {
     if (!uid) return;
@@ -104,20 +92,16 @@ export default function HomeScreen({ navigation }) {
     const dataRef = ref(database, `users/${uid}/sensorData`);
     const historyRef = ref(database, `users/${uid}/history`);
     const lastSavedRef = ref(database, `users/${uid}/lastSavedData`);
-
     let initialLoad = true;
 
     onValue(lastSavedRef, (snap) => {
-      if (snap.exists()) {
-        setLastSavedData(snap.val());
-      }
+      if (snap.exists()) setLastSavedData(snap.val());
     });
 
     onValue(dataRef, (snap) => {
       if (snap.exists()) {
         const newData = snap.val();
         setData(newData);
-
         if (initialLoad || !lastSavedData) {
           initialLoad = false;
           return;
@@ -130,28 +114,15 @@ export default function HomeScreen({ navigation }) {
 
         if (changed) {
           const newEntryRef = push(historyRef);
-          set(newEntryRef, {
-            ...newData,
-            timestamp: new Date().toISOString(),
-          });
-
-          update(userRef, {
-            lastSavedData: newData,
-          });
-
+          set(newEntryRef, { ...newData, timestamp: new Date().toISOString() });
+          update(userRef, { lastSavedData: newData });
           setLastSavedData(newData);
           setShowBadge(true);
-          Animated.timing(badgeOpacity, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }).start(() => {
+          Animated.timing(badgeOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start(() => {
             setTimeout(() => {
-              Animated.timing(badgeOpacity, {
-                toValue: 0,
-                duration: 300,
-                useNativeDriver: true,
-              }).start(() => setShowBadge(false));
+              Animated.timing(badgeOpacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(() =>
+                setShowBadge(false)
+              );
             }, 2000);
           });
         }
@@ -159,9 +130,7 @@ export default function HomeScreen({ navigation }) {
     });
 
     onValue(userRef, (snap) => {
-      if (snap.exists()) {
-        setUserInfo(snap.val());
-      }
+      if (snap.exists()) setUserInfo(snap.val());
     });
 
     onValue(historyRef, (snapshot) => {
@@ -217,9 +186,7 @@ export default function HomeScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.navigate("Profil")}>
           <Image
             source={
-              userInfo.photo
-                ? { uri: userInfo.photo }
-                : require("../assets/avatar-placeholder.png")
+              userInfo.photo ? { uri: userInfo.photo } : require("../assets/avatar-placeholder.png")
             }
             style={styles.avatar}
           />
@@ -227,9 +194,9 @@ export default function HomeScreen({ navigation }) {
       </View>
 
       <View style={styles.cardContainer}>
-        <Card title={t.temperature} value={`${data.temperature} °C`} color="#007AFF" />
-        <Card title={t.pulse} value={`${data.pouls} BPM`} color="#FF3B30" />
-        <Card title={t.spo2} value={`${data.spo2} %`} color="#34C759" />
+        <Card title={t.temperature} value={`${data.temperature} °C`} color="#007AFF" theme={theme} />
+        <Card title={t.pulse} value={`${data.pouls} BPM`} color="#FF3B30" theme={theme} />
+        <Card title={t.spo2} value={`${data.spo2} %`} color="#34C759" theme={theme} />
       </View>
 
       <Text style={[styles.subtitle, { color: colors.text }]}>{t.averages}</Text>
@@ -243,10 +210,7 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.alertBox}>
           <Text style={styles.alertText}>
             ⚠️ {t.alert}{" "}
-            <Text
-              style={{ color: "#007AFF", textDecorationLine: "underline" }}
-              onPress={() => navigation.navigate("Doctors")}
-            >
+            <Text style={{ color: "#007AFF", textDecorationLine: "underline" }} onPress={() => navigation.navigate("Doctors")}>
               {t.consult}
             </Text>
           </Text>
@@ -268,18 +232,24 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-const Card = ({ title, value, color }) => (
-  <View style={[styles.card, { borderLeftColor: color }]}>
-    <Text style={styles.label}>{title}</Text>
-    <Text style={[styles.value, { color }]}>{value}</Text>
-  </View>
-);
+const Card = ({ title, value, color, theme }) => {
+  const bgColor = theme === "dark" ? darkTheme.cardBackground : lightTheme.cardBackground;
+  const textColor = theme === "dark" ? darkTheme.text : lightTheme.text;
+
+  return (
+    <View style={[styles.card, { borderLeftColor: color, backgroundColor: bgColor }]}>
+      <Text style={[styles.label, { color: textColor }]}>{title}</Text>
+      <Text style={[styles.value, { color }]}>{value}</Text>
+    </View>
+  );
+};
 
 const lightTheme = {
   background: "#F5F5F5",
   text: "#000",
   subtext: "#555",
   success: "#34C759",
+  cardBackground: "#fff",
 };
 
 const darkTheme = {
@@ -287,6 +257,7 @@ const darkTheme = {
   text: "#f0f0f0",
   subtext: "#aaa",
   success: "#0f0",
+  cardBackground: "#2c2c2e",
 };
 
 const translations = {
@@ -305,9 +276,9 @@ const translations = {
     saved: "Mesure enregistrée",
     assistant: "Assistant",
     title: "Alerte !!",
-      message: "Voulez-vous exporter les 5 dernières mesures ?",
-      cancel: "Annuler",
-      confirm: "Exporter",
+    message: "Voulez-vous exporter les 5 dernières mesures ?",
+    cancel: "Annuler",
+    confirm: "Exporter",
   },
   en: {
     home: "Home",
@@ -324,9 +295,9 @@ const translations = {
     saved: "Saved",
     assistant: "Assistant",
     title: "Alert",
-      message: "Do you want to export the last 5 measurements?",
-      cancel: "Cancel",
-      confirm: "Export",
+    message: "Do you want to export the last 5 measurements?",
+    cancel: "Cancel",
+    confirm: "Export",
   },
 };
 
@@ -360,7 +331,6 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   card: {
-    backgroundColor: "#fff",
     padding: 15,
     borderRadius: 10,
     marginBottom: 12,
@@ -369,7 +339,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#444",
   },
   value: {
     fontSize: 24,
@@ -410,7 +379,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   btn: {
-    backgroundColor: "#007AFF",
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
@@ -434,7 +402,6 @@ const styles = StyleSheet.create({
   badge: {
     position: "absolute",
     top: 30,
-    backgroundColor: "#34C759",
     padding: 10,
     borderRadius: 8,
     zIndex: 99,

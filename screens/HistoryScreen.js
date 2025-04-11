@@ -23,8 +23,27 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { AppContext } from "../AppContext";
 
+// Thèmes
+const lightTheme = {
+  background: "#ffffff",
+  card: "#ffffff",
+  text: "#000000",
+  secondary: "#eeeeee",
+  buttonText: "#ffffff",
+};
+
+const darkTheme = {
+  background: "#121212",
+  card: "#1e1e1e",
+  text: "#ffffff",
+  secondary: "#333333",
+  buttonText: "#ffffff",
+};
+
 export default function HistoryScreen() {
-  const { darkMode, language } = useContext(AppContext);
+  const { theme, language } = useContext(AppContext);
+  const isDark = theme === "dark";
+  const colors = isDark ? darkTheme : lightTheme;
   const uid = auth.currentUser?.uid;
 
   const [history, setHistory] = useState([]);
@@ -129,7 +148,7 @@ export default function HistoryScreen() {
   };
 
   const handleDeleteSelected = () => {
-    Alert.alert("Confirmation", `Supprimer ${selectedItems.length} élément(s) ?`, [
+    Alert.alert(t.confirmDelete, "", [
       { text: "Annuler", style: "cancel" },
       {
         text: "Supprimer",
@@ -180,7 +199,7 @@ export default function HistoryScreen() {
     <TouchableOpacity
       style={[
         styles.card,
-        darkMode && { backgroundColor: "#1e1e1e" },
+        { backgroundColor: colors.card },
         item.pinned && styles.pinned,
         selectedItems.includes(item.id) && styles.selected,
       ]}
@@ -193,20 +212,11 @@ export default function HistoryScreen() {
       onPress={() => {
         if (selectionMode) toggleSelection(item.id);
       }}
-    ><Text style={[styles.text, darkMode && styles.textDark]}>
-    🕒 {formatDate(item.timestamp)}
-  </Text>
-  <Text style={[styles.text, darkMode && styles.textDark]}>
-    🌡 {item.temperature} °C
-  </Text>
-  <Text style={[styles.text, darkMode && styles.textDark]}>
-    💓 {item.pouls} BPM
-  </Text>
-  <Text style={[styles.text, darkMode && styles.textDark]}>
-    🫁 {item.spo2} %
-  </Text>
-  
-
+    >
+      <Text style={{ color: colors.text }}>🕒 {formatDate(item.timestamp)}</Text>
+      <Text style={{ color: colors.text }}>🌡 {item.temperature} °C</Text>
+      <Text style={{ color: colors.text }}>💓 {item.pouls} BPM</Text>
+      <Text style={{ color: colors.text }}>🫁 {item.spo2} %</Text>
       <View style={styles.actions}>
         {!showArchived ? (
           <>
@@ -217,7 +227,7 @@ export default function HistoryScreen() {
                 })
               }
             >
-              <Text style={styles.actionBtn}>
+              <Text style={{ color: colors.text }}>
                 {item.pinned ? t.unpin : t.pin}
               </Text>
             </TouchableOpacity>
@@ -228,7 +238,7 @@ export default function HistoryScreen() {
                 })
               }
             >
-              <Text style={styles.actionBtn}>{t.archive}</Text>
+              <Text style={{ color: colors.text }}>{t.archive}</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -239,7 +249,7 @@ export default function HistoryScreen() {
               })
             }
           >
-            <Text style={[styles.actionBtn, { color: "green" }]}>{t.restore}</Text>
+            <Text style={{ color: "green" }}>{t.restore}</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity
@@ -255,23 +265,21 @@ export default function HistoryScreen() {
             ])
           }
         >
-          <Text style={[styles.actionBtn, { color: "red" }]}>{t.deleteOne}</Text>
+          <Text style={{ color: "red" }}>{t.deleteOne}</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <TouchableWithoutFeedback
-      onPress={() => {
-        if (selectionMode) {
-          setSelectionMode(false);
-          setSelectedItems([]);
-        }
-        Keyboard.dismiss();
-      }}
-    >
-      <View style={[styles.container, darkMode && { backgroundColor: "#121212" }]}>
+    <TouchableWithoutFeedback onPress={() => {
+      if (selectionMode) {
+        setSelectionMode(false);
+        setSelectedItems([]);
+      }
+      Keyboard.dismiss();
+    }}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <FlatList
           data={filteredHistory}
           keyExtractor={(item) => item.id}
@@ -280,44 +288,35 @@ export default function HistoryScreen() {
             <View style={{ marginBottom: 10 }}>
               <TouchableOpacity
                 onPress={() => setShowArchived(!showArchived)}
-                style={styles.toggleBtn}
+                style={[styles.toggleBtn, { backgroundColor: "#007AFF" }]}
               >
-                <Text style={styles.toggleText}>
+                <Text style={{ color: "#fff", fontWeight: "bold", textAlign: "center" }}>
                   {showArchived ? t.back : t.archive}
                 </Text>
               </TouchableOpacity>
-  
+
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
-  <Text style={{ fontSize: 20, color: darkMode ? "#fff" : "#000" }}>🔍</Text>
-                <TouchableOpacity onPress={() => setShowStartPicker(true)} style={styles.dateBtn}>
-                  <Text style={[styles.dateText, darkMode && styles.dateTextDark]}>{t.start}</Text>
+                <Text style={{ fontSize: 20, color: colors.text }}>🔍</Text>
+                <TouchableOpacity onPress={() => setShowStartPicker(true)} style={[styles.dateBtn, { backgroundColor: colors.secondary }]}>
+                  <Text style={{ color: colors.text }}>{t.start}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => setShowEndPicker(true)} style={styles.dateBtn}>
-                  <Text style={[styles.dateText, darkMode && styles.dateTextDark]}>{t.end}</Text>
+                <TouchableOpacity onPress={() => setShowEndPicker(true)} style={[styles.dateBtn, { backgroundColor: colors.secondary }]}>
+                  <Text style={{ color: colors.text }}>{t.end}</Text>
                 </TouchableOpacity>
                 {(dateStart || dateEnd) && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setDateStart(null);
-                      setDateEnd(null);
-                    }}
-                    style={styles.resetBtn}
-                  >
-                    <Text style={[styles.dateText, darkMode && styles.dateTextDark]}>{t.reset}</Text>
+                  <TouchableOpacity onPress={() => { setDateStart(null); setDateEnd(null); }} style={styles.resetBtn}>
+                    <Text style={{ color: "#fff" }}>{t.reset}</Text>
                   </TouchableOpacity>
                 )}
               </View>
-  
+
               {showStartPicker && (
                 <DateTimePicker
                   value={dateStart || new Date()}
                   mode="date"
                   display="default"
-                  onChange={(e, date) => {
-                    setShowStartPicker(false);
-                    if (date) setDateStart(date);
-                  }}
-                  themeVariant={darkMode ? "dark" : "light"}
+                  onChange={(e, date) => { setShowStartPicker(false); if (date) setDateStart(date); }}
+                  themeVariant={isDark ? "dark" : "light"}
                 />
               )}
               {showEndPicker && (
@@ -325,21 +324,18 @@ export default function HistoryScreen() {
                   value={dateEnd || new Date()}
                   mode="date"
                   display="default"
-                  onChange={(e, date) => {
-                    setShowEndPicker(false);
-                    if (date) setDateEnd(date);
-                  }}
-                  themeVariant={darkMode ? "dark" : "light"}
+                  onChange={(e, date) => { setShowEndPicker(false); if (date) setDateEnd(date); }}
+                  themeVariant={isDark ? "dark" : "light"}
                 />
               )}
-  
+
               {selectionMode && (
                 <View>
-                  <Text style={[styles.selectedCount, darkMode && styles.selectedCountDark]}>
+                  <Text style={{ fontWeight: "bold", color: colors.text }}>
                     {selectedItems.length} {t.selected}
                   </Text>
                   <TouchableOpacity onPress={handleSelectAllToggle}>
-                    <Text style={[{ color: "#007AFF" }, darkMode && { color: "#4DA3FF" }]}>
+                    <Text style={{ color: "#4DA3FF" }}>
                       {selectedItems.length === filteredHistory.length ? t.deselectAll : t.selectAll}
                     </Text>
                   </TouchableOpacity>
@@ -348,11 +344,11 @@ export default function HistoryScreen() {
             </View>
           }
         />
-  
-        <TouchableOpacity style={styles.exportFixedBtn} onPress={handleExport}>
-          <Text style={styles.exportText}>{t.export}</Text>
+
+        <TouchableOpacity style={[styles.exportFixedBtn, { backgroundColor: "#34C759" }]} onPress={handleExport}>
+          <Text style={{ color: colors.buttonText, textAlign: "center", fontWeight: "bold" }}>{t.export}</Text>
         </TouchableOpacity>
-  
+
         {selectionMode && selectedItems.length > 0 && (
           <TouchableOpacity style={styles.fab} onPress={handleDeleteSelected}>
             <Text style={{ color: "#fff", fontSize: 20 }}>🗑️</Text>
@@ -362,34 +358,33 @@ export default function HistoryScreen() {
     </TouchableWithoutFeedback>
   );
 }
-  
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, paddingBottom: 100 },
+  container: {
+    flex: 1,
+    padding: 20,
+    paddingBottom: 100,
+  },
   card: {
-    backgroundColor: "#fff",
     padding: 15,
     borderRadius: 10,
     marginBottom: 15,
     elevation: 2,
   },
-  pinned: { borderColor: "#007AFF", borderWidth: 2 },
-  selected: { borderColor: "#ff9500", borderWidth: 2 },
+  pinned: {
+    borderColor: "#007AFF",
+    borderWidth: 2,
+  },
+  selected: {
+    borderColor: "#ff9500",
+    borderWidth: 2,
+  },
   actions: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 10,
   },
-  actionBtn: { fontWeight: "bold", fontSize: 14 },
-  toggleBtn: {
-    backgroundColor: "#007AFF",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  toggleText: { color: "#fff", fontWeight: "bold", textAlign: "center" },
   dateBtn: {
-    backgroundColor: "#eee",
     padding: 8,
     borderRadius: 6,
     minWidth: 70,
@@ -400,32 +395,21 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 6,
   },
-  dateText: {
-    color: "#000",
-    fontWeight: "bold",
-  },
-  dateTextDark: {
-    color: "#fff",
-  },
-  selectedCount: {
-    fontWeight: "bold",
-    color: "#000",
-  },
-  selectedCountDark: {
-    color: "#fff",
+  toggleBtn: {
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
   },
   exportFixedBtn: {
     position: "absolute",
     bottom: 30,
-    left: "62%",
+    left: "63%",
     transform: [{ translateX: -80 }],
-    backgroundColor: "#34C759",
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 30,
     elevation: 4,
   },
-  exportText: { color: "#fff", textAlign: "center", fontWeight: "bold" },
   fab: {
     position: "absolute",
     bottom: 30,
@@ -435,14 +419,4 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     elevation: 5,
   },
-
-  text: {
-    color: "#333",
-  },
-  textDark: {
-    color: "#fff",
-  },
-  
-  
-  
 });
