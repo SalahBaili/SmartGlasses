@@ -16,6 +16,7 @@ import * as ImagePicker from "expo-image-picker";
 import { database, ref, update, onValue, auth } from "../firebaseConfig";
 import { AppContext } from "../AppContext";
 
+
 // Thèmes
 const lightTheme = {
   background: "#ffffff",
